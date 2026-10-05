@@ -1,4 +1,4 @@
-﻿const KEY='wpjoo.expert.v1',VERSION='۱۴۰۵/۰۷/۱۴', $=s=>document.querySelector(s), fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
+﻿const KEY='wpjoo.expert.v1',VERSION='۱۴۰۵/۰۷/۱۵', $=s=>document.querySelector(s), fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
 let vt=$('#versionTag');if(vt)vt.textContent='• نسخه '+VERSION;
 let db=JSON.parse(localStorage.getItem(KEY)||'{"appointments":[],"reports":[],"lastImport":null}'),filter='all';
 if(!Array.isArray(db.reports))db.reports=[];
@@ -128,11 +128,13 @@ function download(n,d){
   a.click();
   a.remove();
 }
+// نام فایل‌ها شمسی و قابل‌فهم است تا کاربر راحت‌تر آن‌ها را پیدا کند
+function jdate(){let j=Jalali.fromDate(new Date());return Jalali.fa(Jalali.pad(j.jy))+'-'+Jalali.fa(Jalali.pad(j.jm))+'-'+Jalali.fa(Jalali.pad(j.jd))}
 
-$('#exportData').onclick=()=>download('wpjoo-expert-backup.json',db);
+$('#exportData').onclick=()=>download('پشتیبان-کامل-پنل-کارشناس-'+jdate()+'.json',db);
 $('#exportReports').onclick=()=>{
   if(!db.reports.length){alert('هنوز گزارشی ثبت نشده است.');return}
-  download('wpjoo-expert-reports-'+new Date().toISOString().slice(0,10)+'.json',db.reports);
+  download('گزارش‌های-کارشناس-'+jdate()+'.json',db.reports);
 };
 $('#clearData').onclick=()=>{
   if(!confirm('اطلاعات پنل کارشناس پاک شود؟'))return;
