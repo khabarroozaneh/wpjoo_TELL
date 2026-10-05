@@ -1,4 +1,4 @@
-﻿const KEY='wpjoo.expert.v1',VERSION='۱۴۰۵/۰۷/۱۲', $=s=>document.querySelector(s), fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
+﻿const KEY='wpjoo.expert.v1',VERSION='۱۴۰۵/۰۷/۱۴', $=s=>document.querySelector(s), fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
 let vt=$('#versionTag');if(vt)vt.textContent='• نسخه '+VERSION;
 let db=JSON.parse(localStorage.getItem(KEY)||'{"appointments":[],"reports":[],"lastImport":null}'),filter='all';
 if(!Array.isArray(db.reports))db.reports=[];
@@ -137,7 +137,7 @@ $('#exportReports').onclick=()=>{
 $('#clearData').onclick=()=>{
   if(!confirm('اطلاعات پنل کارشناس پاک شود؟'))return;
   if(!confirm('تأیید نهایی: همه قرارها و گزارش‌های ثبت‌شده برای همیشه حذف می‌شوند. مطمئن هستید؟'))return;
-  db={appointments:[],reports:[],notified:{},dismissed:[],lastImport:null};
+  db={appointments:[],reports:[],notified:{},alarmed:{},dismissed:[],lastImport:null};
   save();
 };
 
@@ -188,21 +188,43 @@ if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
 if(!db.notified||typeof db.notified!=='object')db.notified={};
 function remindersOn(){return Notification.permission==='granted'}
 function dismissed(k){return db.dismissed&&db.dismissed.includes(k)}
+let actx=null;
+// آلارم صوتی بدون فایل خارجی — با نوسان‌ساز Web Audio API تولید می‌شود
+function alarm(){
+  try{
+    actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+    if(actx.state==='suspended')actx.resume();
+    let t=actx.currentTime,beeps=[0,.35,.7,1.05,1.4];
+    beeps.forEach((o,i)=>{
+      let g=actx.createGain(),osc=actx.createOscillator();
+      osc.type='sine';osc.frequency.value=i%2?660:880;
+      g.gain.setValueAtTime(0,t+o);
+      g.gain.linearRampToValueAtTime(.3,t+o+.04);
+      g.gain.setValueAtTime(.3,t+o+.22);
+      g.gain.linearRampToValueAtTime(0,t+o+.32);
+      osc.connect(g);g.connect(actx.destination);
+      osc.start(t+o);osc.stop(t+o+.34);
+    });
+  }catch(err){}
+}
+// مرورگر صدا را فقط پس از تعامل کاربر پخش می‌کند؛ اولین کلیک AudioContext را فعال می‌کند
+document.addEventListener('click',()=>{try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();if(actx.state==='suspended')actx.resume()}catch(err){}},{once:true});
 function checkReminders(){
   if(!remindersOn())return;
   let now=Date.now();
   db.appointments.forEach(r=>{
     let d=date(r.followUp);if(!d)return;
     let k=key(r),t=d.getTime(),x=t-now;
-    if(dismissed(k))return;
-    if(x<=86400000){
-      let tag='gharar-'+k;
-      if(!db.notified[tag]){
-        db.notified[tag]=1;save();
-        let body=x<=0?'اکنون زمان قرار است':x<=3600000?'کمتر از یک ساعت تا قرار مانده':'۲۴ ساعت تا قراردانید';
-        navigator.serviceWorker.ready.then(reg=>reg.showNotification('یادآوری قرار — '+(r.lead?.ownerName||r.ownerName||''),{body,body,tag,requireInteraction:true,data:{k}}));
+    if(dismissed(k))return;      if(x<=86400000){
+        let tag='gharar-'+k;
+        // ۱۵ دقیقه قبل از قرار آلارم صوتی پخش می‌شود (نوتیفیکیشن از قبل فعال است)
+        if(x<=900000){if(!db.alarmed||typeof db.alarmed!=='object')db.alarmed={};if(!db.alarmed[tag]){db.alarmed[tag]=1;save();alarm()}}
+        if(!db.notified[tag]){
+          db.notified[tag]=1;save();
+          let body=x<=0?'اکنون زمان قرار است':x<=3600000?'کمتر از یک ساعت تا قرار مانده':'۲۴ ساعت تا قراردانید';
+          navigator.serviceWorker.ready.then(reg=>reg.showNotification('یادآوری قرار — '+(r.lead?.ownerName||r.ownerName||''),{body,body,tag,requireInteraction:true,data:{k}}));
+        }
       }
-    }
   });
 }
 if('Notification' in window){

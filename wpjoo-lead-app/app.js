@@ -1,4 +1,4 @@
-﻿const KEY='wpjoo.v1',VERSION='۱۴۰۵/۰۷/۱۲';const $=s=>document.querySelector(s);let vt=$('#versionTag');if(vt)vt.textContent='• نسخه '+VERSION;const fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);let db=JSON.parse(localStorage.getItem(KEY)||'{"leads":[],"reports":[],"cursor":0,"draft":null,"duplicates":0}');
+﻿const KEY='wpjoo.v1',VERSION='۱۴۰۵/۰۷/۱۴';const $=s=>document.querySelector(s);let vt=$('#versionTag');if(vt)vt.textContent='• نسخه '+VERSION;const fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);let db=JSON.parse(localStorage.getItem(KEY)||'{"leads":[],"reports":[],"cursor":0,"draft":null,"duplicates":0}');
 function save(){localStorage.setItem(KEY,JSON.stringify(db));refresh()}function norm(v=''){return v.toString().trim().toLowerCase().replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/^https?:\/\//,'').replace(/^www\./,'').replace(/^tel:/,'').replace(/\/$/,'').replace(/[\s().-]/g,'')}function fingerprints(x){let u=norm(x.url||x.website||x.domain||x.link),p=norm(x.phone||x.mobile||x.tel),n=norm(x.name||x.title);return [...new Set([u&&'url:'+u,p&&'phone:'+p,n&&p&&'namephone:'+n+'|'+p].filter(Boolean))]}function key(x){return fingerprints(x)[0]||''}function pick(x,keys){for(const k of keys){let v=String(x[k]??'').trim();if(v)return v}return ''}function site(x){return x.url||x.website||x.domain||x.link||'بدون لینک'}function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function go(id){document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));$('#'+id).classList.add('active');if(id==='work')renderWork();if(id==='reports')renderReports();refresh()}document.addEventListener('click',e=>{let b=e.target.closest('[data-go]');if(b)go(b.dataset.go)});
 const scheduleLabel=document.createElement('label');scheduleLabel.innerHTML='<input id="scheduleFollowUp" type="checkbox"> انتقال تماس غیرنهایی به تقویم پیگیری';$('#followUpLabel').closest('label').before(scheduleLabel);
@@ -44,6 +44,27 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closePicker()});
 if(!db.notified||typeof db.notified!=='object')db.notified={};
 function remindersOn(){return 'Notification' in window&&Notification.permission==='granted'}
 function dismissed(k){return Array.isArray(db.dismissed)&&db.dismissed.includes(k)}
+let actx=null;
+// آلارم صوتی بدون فایل خارجی — با نوسان‌ساز Web Audio API تولید می‌شود
+function alarm(){
+  try{
+    actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+    if(actx.state==='suspended')actx.resume();
+    let t=actx.currentTime,beeps=[0,.35,.7,1.05,1.4];
+    beeps.forEach((o,i)=>{
+      let g=actx.createGain(),osc=actx.createOscillator();
+      osc.type='sine';osc.frequency.value=i%2?660:880;
+      g.gain.setValueAtTime(0,t+o);
+      g.gain.linearRampToValueAtTime(.3,t+o+.04);
+      g.gain.setValueAtTime(.3,t+o+.22);
+      g.gain.linearRampToValueAtTime(0,t+o+.32);
+      osc.connect(g);g.connect(actx.destination);
+      osc.start(t+o);osc.stop(t+o+.34);
+    });
+  }catch(err){}
+}
+// مرورگر صدا را فقط پس از تعامل کاربر پخش می‌کند؛ اولین کلیک AudioContext را فعال می‌کند
+document.addEventListener('click',()=>{try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();if(actx.state==='suspended')actx.resume()}catch(err){}},{once:true});
 function checkCallReminders(){
   if(!remindersOn())return;
   let now=Date.now();
@@ -53,6 +74,7 @@ function checkCallReminders(){
     if(dismissed(k))return;
     if(x<=900000&&!db.notified[tag]){
       db.notified[tag]=1;save();
+      alarm();
       let body=x<=0?'اکنون زمان تماس است':x<=60000?'کمتر از یک دقیقه تا تماس':'۱۵ دقیقه تا زمان تماس';
       navigator.serviceWorker.ready.then(reg=>reg.showNotification('یادآوری تماس — '+(reportLead(r).ownerName||''),{body,tag,requireInteraction:true,data:{k}}));
     }
