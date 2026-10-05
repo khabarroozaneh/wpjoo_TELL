@@ -9,7 +9,7 @@
 ├── index.html              # صفحه فرود: لینک هر دو برنامه
 ├── .github/workflows/deploy.yml  # استقرار خودکار روی GitHub Pages
 ├── wpjoo-lead-app/         # برنامه منشی: مدیریت لید، گزارش، تقویم پیگیری شمسی
-└── wpjoo-expert-app/       # برنامه کارشناس: مشاهده قرارهای جلسه
+└── wpjoo-expert-app/       # برنامه کارشناس: مشاهده قرارها و ثبت گزارش جلسه
 ```
 
 ## انتشار روی GitHub Pages

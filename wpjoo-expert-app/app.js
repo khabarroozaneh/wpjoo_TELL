@@ -1,5 +1,9 @@
 ﻿const KEY='wpjoo.expert.v1', $=s=>document.querySelector(s), fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
-let db=JSON.parse(localStorage.getItem(KEY)||'{"appointments":[],"lastImport":null}'),filter='all';
+let db=JSON.parse(localStorage.getItem(KEY)||'{"appointments":[],"reports":[],"lastImport":null}'),filter='all';
+if(!Array.isArray(db.reports))db.reports=[];
+
+function go(id){document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));$('#'+id).classList.add('active');if(id==='main')render()}
+document.addEventListener('click',e=>{let b=e.target.closest('[data-go]');if(b)go(b.dataset.go)});
 
 const save=()=>{localStorage.setItem(KEY,JSON.stringify(db));render()};
 
@@ -8,6 +12,7 @@ const date=v=>{let d=new Date(v);return Number.isNaN(d.getTime())?null:d};
 const key=r=>r.id||[r.leadId,r.followUp,r.createdAt,r.lead?.url].join('|');
 const type=r=>{let d=date(r.followUp);if(!d)return'bad';let x=d-Date.now();return x<0?'overdue':x<=86400000?'soon':'future'};
 const fmt=v=>{let d=date(v);return d?d.toLocaleString('fa-IR',{dateStyle:'medium',timeStyle:'short'}):'ثبت نشده'};
+const reportFor=r=>db.reports.find(x=>x.appointmentKey===key(r));
 const ago=v=>{let d=date(v);if(!d)return'';let x=d-Date.now(),m=Math.floor(Math.abs(x)/60000),h=Math.floor(m/60);return x>=0?`${fa(h)} ساعت و ${fa(m%60)} دقیقه مانده`:`${fa(h)} ساعت و ${fa(m%60)} دقیقه گذشته`};
 
 function render(){
@@ -16,11 +21,13 @@ function render(){
     .sort((a,b)=>date(a.followUp)-date(b.followUp));
   let soon=a.filter(r=>r.t==='soon');
   let over=a.filter(r=>r.t==='overdue');
-  let show=filter==='soon'?soon:filter==='overdue'?over:a;
+  let rep=a.filter(r=>reportFor(r));
+  let show=filter==='soon'?soon:filter==='overdue'?over:filter==='reported'?rep:filter==='unreported'?a.filter(r=>!reportFor(r)):a;
 
   $('#totalCount').textContent=fa(a.length);
   $('#soonCount').textContent=fa(soon.length);
   $('#overdueCount').textContent=fa(over.length);
+  $('#reportedCount').textContent=fa(rep.length);
 
   let al=$('#alertBox');
   if(soon.length){al.className='alert urgent';al.innerHTML=`هشدار: ${fa(soon.length)} قرار تا ۲۴ ساعت آینده؛ نزدیک‌ترین قرار ${fmt(soon[0].followUp)}`}
@@ -37,6 +44,8 @@ function render(){
         <div class="line"><b>تلفن:</b> ${esc(r.lead?.phone||r.phone||'ثبت نشده')}</div>
         <div class="line"><b>توضیحات:</b> ${esc(r.notes||'')}</div>
         <div class="line"><b>نام پاسخ‌دهنده:</b> ${esc(r.contactName||'ثبت نشده')}</div>
+        ${reportFor(r)?`<div class="report-box"><b>گزارش ثبت‌شده:</b><br>${esc(reportFor(r).status)}<br>${esc(reportFor(r).notes||'')}<br><small>${fmt(reportFor(r).at)}${reportFor(r).nextAction?' — اقدام بعدی: '+esc(reportFor(r).nextAction):''}</small></div>`:''}
+        <button type="button" class="reportBtn" data-report="${esc(key(r))}">${reportFor(r)?'ویرایش گزارش':'ثبت گزارش قرار'}</button>
       </article>`).join('')
     :'<div class="result">برای این فیلتر قراری وجود ندارد.</div>';
 
@@ -77,9 +86,13 @@ function download(n,d){
 }
 
 $('#exportData').onclick=()=>download('wpjoo-expert-backup.json',db);
+$('#exportReports').onclick=()=>{
+  if(!db.reports.length){alert('هنوز گزارشی ثبت نشده است.');return}
+  download('wpjoo-expert-reports-'+new Date().toISOString().slice(0,10)+'.json',db.reports);
+};
 $('#clearData').onclick=()=>{
   if(confirm('اطلاعات پنل کارشناس پاک شود؟')){
-    db={appointments:[],lastImport:null};
+    db={appointments:[],reports:[],lastImport:null};
     save();
   }
 };
@@ -89,6 +102,38 @@ document.querySelectorAll('.filter').forEach(b=>b.onclick=()=>{
   b.classList.add('active');
   filter=b.dataset.filter;
   render();
+});
+
+let editingKey=null;
+document.addEventListener('click',e=>{
+  let b=e.target.closest('[data-report]');
+  if(!b)return;
+  editingKey=b.dataset.report;
+  let r=db.appointments.find(x=>key(x)===editingKey);
+  if(!r)return;
+  $('#reportCard').innerHTML=`<h3>${esc(r.lead?.ownerName||r.ownerName||'نام صاحب سایت ثبت نشده')}</h3><div class="line"><b>زمان قرار:</b> ${fmt(r.followUp)}</div><div class="line"><b>سایت:</b> ${esc(r.lead?.url||r.url||'ثبت نشده')}</div><div class="line"><b>تلفن:</b> ${esc(r.lead?.phone||r.phone||'ثبت نشده')}</div>`;
+  let old=reportFor(r);
+  $('#reportStatus').value=old?old.status:'';
+  $('#reportNotes').value=old?old.notes:'';
+  let d=old&&old.at?new Date(old.at):new Date();
+  let p=n=>String(n).padStart(2,'0');
+  $('#reportAt').value=`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  $('#reportSaved').textContent='';
+  go('reportView');
+});
+
+$('#reportForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  if(!editingKey)return;
+  let status=$('#reportStatus').value,notes=$('#reportNotes').value.trim(),at=$('#reportAt').value;
+  if(!status||notes.length<3){alert('نتیجه جلسه و توضیحات (حداقل ۳ حرف) اجباری است.');return}
+  let i=db.reports.findIndex(x=>x.appointmentKey===editingKey);
+  let rec={appointmentKey:editingKey,status,notes,at:new Date(at).toISOString(),updatedAt:new Date().toISOString()};
+  if(i>=0)db.reports[i]=rec;else db.reports.push(rec);
+  save();
+  $('#reportForm').reset();
+  $('#reportSaved').textContent='گزارش ذخیره شد و روی دستگاه نگه داشته شد.';
+  go('main');
 });
 
 render();
