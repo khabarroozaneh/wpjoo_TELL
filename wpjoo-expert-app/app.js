@@ -66,7 +66,7 @@ function render(){
     :'<div class="result">برای این فیلتر قراری وجود ندارد.</div>';
 
   $('#result').textContent=db.lastImport
-    ?`${fa(db.lastImport.added)} قرار اضافه شد؛ ${fa(db.lastImport.duplicates)} تکراری نادیده گرفته شد.`
+    ?`${fa(db.lastImport.added)} قرار اضافه شد${db.lastImport.updated?`؛ ${fa(db.lastImport.updated)} قرار به‌روزرسانی شد`:''}؛ ${fa(db.lastImport.duplicates)} تکراری نادیده گرفته شد${db.lastImport.pruned?`؛ ${fa(db.lastImport.pruned)} قرار لغو‌شده از فهرست حذف شد`:''}.`
     :'';
 }
 
@@ -79,16 +79,41 @@ $('#jsonFile').addEventListener('change',async e=>{
     // فقط آخرین گزارش هر لید ملاک است؛ اگر آخرین وضعیت «قرار جلسه با کارشناس» نبود، قرارداد وارد نمی‌شود
     let latest=new Map();
     arr.forEach(r=>{if(!r||!r.leadId)return;let cur=latest.get(r.leadId);if(!cur||new Date(r.createdAt||0).getTime()>=new Date(cur.createdAt||0).getTime())latest.set(r.leadId,r)});
-    let old=new Set(db.appointments.map(key));
-    let added=0,duplicates=0;
+    let pruned=0;
+    if($('#pruneOnImport').checked){
+      // قرارهای قبلی که طبق آخرین گزارش منشی دیگر جلسه‌ای ندارند حذف می‌شوند؛
+      // مگر اینکه کارشناس از قبل برایشان گزارشی ثبت کرده باشد
+      db.appointments=db.appointments.filter(r=>{
+        let l=latest.get(r.leadId);
+        if(l&&l.status!=='قرار جلسه با کارشناس'&&!reportFor(r)){pruned++;return false}
+        return true;
+      });
+    }
+    // هر لید فقط یک قرار در فهرست کارشناس دارد
+    let have=new Map();
+    db.appointments.forEach(r=>{if(r.leadId&&!have.has(r.leadId))have.set(r.leadId,r)});
+    let added=0,updated=0,duplicates=0;
     [...latest.values()].filter(r=>r.status==='قرار جلسه با کارشناس').forEach(r=>{
-      let k=key(r);
-      if(old.has(k)){duplicates++;return}
-      old.add(k);
+      let ex=have.get(r.leadId);
+      if(ex){
+        if(key(ex)===key(r)){duplicates++;return}
+        // قرار قدیمی با جدیدترین گزارش منشی جایگزین می‌شود؛ گزارش‌های ثبت‌شده
+        // کارشناس به کلید جدید منتقل می‌شوند تا سابقه کار از بین نرود
+        let ok=key(ex);
+        Object.assign(ex,r);
+        let nk=key(ex);
+        if(ok!==nk){
+          db.reports.forEach(x=>{if(x.appointmentKey===ok)x.appointmentKey=nk});
+          if(Array.isArray(db.dismissed))db.dismissed=db.dismissed.map(x=>x===ok?nk:x);
+          if(db.notified)Object.keys(db.notified).forEach(t=>{if(t==='gharar-'+ok){db.notified['gharar-'+nk]=db.notified[t];delete db.notified[t]}});
+        }
+        updated++;return;
+      }
       db.appointments.push(r);
+      have.set(r.leadId,r);
       added++;
     });
-    db.lastImport={added,duplicates,file:f.name};
+    db.lastImport={added,updated,duplicates,pruned,file:f.name};
     save();
   }catch(err){
     $('#result').textContent='خطا در خواندن JSON: '+err.message;
