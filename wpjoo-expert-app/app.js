@@ -11,7 +11,7 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const date=v=>{let d=new Date(v);return Number.isNaN(d.getTime())?null:d};
 const key=r=>r.id||[r.leadId,r.followUp,r.createdAt,r.lead?.url].join('|');
 const type=r=>{let d=date(r.followUp);if(!d)return'bad';let x=d-Date.now();return x<0?'overdue':x<=86400000?'soon':'future'};
-const fmt=v=>{let d=date(v);return d?d.toLocaleString('fa-IR',{dateStyle:'medium',timeStyle:'short'}):'ثبت نشده'};
+const fmt=v=>{let d=date(v);return d?Jalali.storageText(Jalali.toStorage(d),'ثبت نشده'):'ثبت نشده'};
 const reportFor=r=>db.reports.find(x=>x.appointmentKey===key(r));
 const ago=v=>{let d=date(v);if(!d)return'';let x=d-Date.now(),m=Math.floor(Math.abs(x)/60000),h=Math.floor(m/60);return x>=0?`${fa(h)} ساعت و ${fa(m%60)} دقیقه مانده`:`${fa(h)} ساعت و ${fa(m%60)} دقیقه گذشته`};
 
@@ -91,10 +91,10 @@ $('#exportReports').onclick=()=>{
   download('wpjoo-expert-reports-'+new Date().toISOString().slice(0,10)+'.json',db.reports);
 };
 $('#clearData').onclick=()=>{
-  if(confirm('اطلاعات پنل کارشناس پاک شود؟')){
-    db={appointments:[],reports:[],lastImport:null};
-    save();
-  }
+  if(!confirm('اطلاعات پنل کارشناس پاک شود؟'))return;
+  if(!confirm('تأیید نهایی: همه قرارها و گزارش‌های ثبت‌شده برای همیشه حذف می‌شوند. مطمئن هستید؟'))return;
+  db={appointments:[],reports:[],notified:{},dismissed:[],lastImport:null};
+  save();
 };
 
 document.querySelectorAll('.filter').forEach(b=>b.onclick=()=>{
@@ -139,3 +139,31 @@ $('#reportForm').addEventListener('submit',e=>{
 render();
 setInterval(render,60000);
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
+
+/* ===== یادآوری قرارها (نوتیفیکیشن) ===== */
+if(!db.notified||typeof db.notified!=='object')db.notified={};
+function remindersOn(){return Notification.permission==='granted'}
+function dismissed(k){return db.dismissed&&db.dismissed.includes(k)}
+function checkReminders(){
+  if(!remindersOn())return;
+  let now=Date.now();
+  db.appointments.forEach(r=>{
+    let d=date(r.followUp);if(!d)return;
+    let k=key(r),t=d.getTime(),x=t-now;
+    if(dismissed(k))return;
+    if(x<=86400000){
+      let tag='gharar-'+k;
+      if(!db.notified[tag]){
+        db.notified[tag]=1;save();
+        let body=x<=0?'اکنون زمان قرار است':x<=3600000?'کمتر از یک ساعت تا قرار مانده':'۲۴ ساعت تا قراردانید';
+        navigator.serviceWorker.ready.then(reg=>reg.showNotification('یادآوری قرار — '+(r.lead?.ownerName||r.ownerName||''),{body,body,tag,requireInteraction:true,data:{k}}));
+      }
+    }
+  });
+}
+if('Notification' in window){
+  if(remindersOn()){$('#notifyBtn').classList.add('hidden');checkReminders();setInterval(checkReminders,30000)}
+  else $('#notifyBtn').classList.remove('hidden');
+}
+$('#notifyBtn').onclick=()=>{Notification.requestPermission().then(p=>{if(p==='granted'){$('#notifyBtn').classList.add('hidden');checkReminders();setInterval(checkReminders,30000)}else alert('دسترسی نوتیفیکیشن داده نشد.')})};
+navigator.serviceWorker.addEventListener('message',e=>{if(e.data&&e.data.dismiss){let k=e.data.dismiss;if(!db.dismissed)db.dismissed=[];if(!db.dismissed.includes(k))db.dismissed.push(k);save()}});
