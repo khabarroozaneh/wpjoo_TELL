@@ -12,14 +12,29 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const date=v=>{let d=new Date(v);return Number.isNaN(d.getTime())?null:d};
 const key=r=>r.id||[r.leadId,r.followUp,r.createdAt,r.lead?.url].join('|');
 const type=r=>{let d=date(r.followUp);if(!d)return'bad';let x=d-Date.now();return x<0?'overdue':x<=86400000?'soon':'future'};
+const CONTRACT='جلسه برگزار شد و قرارداد بسته شد';
 const fmt=v=>{let d=date(v);return d?Jalali.storageText(Jalali.toStorage(d),'ثبت نشده'):'ثبت نشده'};
 const reportFor=r=>db.reports.find(x=>x.appointmentKey===key(r));
 const ago=v=>{let d=date(v);if(!d)return'';let x=d-Date.now(),m=Math.floor(Math.abs(x)/60000),h=Math.floor(m/60);return x>=0?`${fa(h)} ساعت و ${fa(m%60)} دقیقه مانده`:`${fa(h)} ساعت و ${fa(m%60)} دقیقه گذشته`};
 
 function render(){
   let a=db.appointments.map(r=>({...r,t:type(r)}))
-    .filter(r=>r.t!=='bad')
+    .filter(r=>r.t!=='bad');
+  let contracted=a.filter(r=>reportFor(r)&&reportFor(r).status===CONTRACT)
+    .sort((x,y)=>date(y.followUp)-date(x.followUp));
+  a=a.filter(r=>!(reportFor(r)&&reportFor(r).status===CONTRACT))
     .sort((a,b)=>date(a.followUp)-date(b.followUp));
+  $('#contractCount').textContent=fa(contracted.length);
+  $('#contractList').innerHTML=contracted.length?
+    contracted.map(r=>`
+      <article class="appointment reported">
+        <h3>${esc(r.lead?.ownerName||r.ownerName||'نام صاحب سایت ثبت نشده')}</h3>
+        <div class="line"><b>زمان قرار:</b> ${fmt(r.followUp)}</div>
+        <div class="line"><b>سایت:</b> ${esc(r.lead?.url||r.url||'ثبت نشده')}</div>
+        <div class="line"><b>تلفن:</b> ${esc(r.lead?.phone||r.phone||'ثبت نشده')}</div>
+        <div class="report-box"><b>قرارداد بسته شد</b><br>${esc(reportFor(r).notes||'')}<br><small>${fmt(reportFor(r).at)}</small></div>
+      </article>`).join('')
+    :'<div class="result">هنوز قراردادی بسته نشده است.</div>';
   let soon=a.filter(r=>r.t==='soon');
   let over=a.filter(r=>r.t==='overdue');
   let rep=a.filter(r=>reportFor(r));
@@ -61,9 +76,12 @@ $('#jsonFile').addEventListener('change',async e=>{
   try{
     let raw=JSON.parse(await f.text());
     let arr=Array.isArray(raw)?raw:(raw.reports||raw.data||raw.items||[]);
+    // فقط آخرین گزارش هر لید ملاک است؛ اگر آخرین وضعیت «قرار جلسه با کارشناس» نبود، قرارداد وارد نمی‌شود
+    let latest=new Map();
+    arr.forEach(r=>{if(!r||!r.leadId)return;let cur=latest.get(r.leadId);if(!cur||new Date(r.createdAt||0).getTime()>=new Date(cur.createdAt||0).getTime())latest.set(r.leadId,r)});
     let old=new Set(db.appointments.map(key));
     let added=0,duplicates=0;
-    arr.filter(r=>r&&r.status==='قرار جلسه با کارشناس').forEach(r=>{
+    [...latest.values()].filter(r=>r.status==='قرار جلسه با کارشناس').forEach(r=>{
       let k=key(r);
       if(old.has(k)){duplicates++;return}
       old.add(k);
