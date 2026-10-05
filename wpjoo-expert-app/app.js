@@ -1,4 +1,5 @@
-﻿const KEY='wpjoo.expert.v1', $=s=>document.querySelector(s), fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
+﻿const KEY='wpjoo.expert.v1',VERSION='۱۴۰۵/۰۷/۱۲', $=s=>document.querySelector(s), fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
+let vt=$('#versionTag');if(vt)vt.textContent='• نسخه '+VERSION;
 let db=JSON.parse(localStorage.getItem(KEY)||'{"appointments":[],"reports":[],"lastImport":null}'),filter='all';
 if(!Array.isArray(db.reports))db.reports=[];
 
