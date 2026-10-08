@@ -1,7 +1,8 @@
-﻿const KEY='wpjoo.expert.v1',VERSION='۱۴۰۵/۰۷/۱۵', $=s=>document.querySelector(s), fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
+﻿const KEY='wpjoo.expert.v1',VERSION='۱۴۰۵/۰۷/۱۶', $=s=>document.querySelector(s), fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
 let vt=$('#versionTag');if(vt)vt.textContent='• نسخه '+VERSION;
-let db=JSON.parse(localStorage.getItem(KEY)||'{"appointments":[],"reports":[],"lastImport":null}'),filter='all';
+let db=JSON.parse(localStorage.getItem(KEY)||'{"appointments":[],"reports":[],"noWebsite":[],"lastImport":null}'),filter='all';
 if(!Array.isArray(db.reports))db.reports=[];
+if(!Array.isArray(db.noWebsite))db.noWebsite=[];
 
 function go(id){document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));$('#'+id).classList.add('active');if(id==='main')render()}
 document.addEventListener('click',e=>{let b=e.target.closest('[data-go]');if(b)go(b.dataset.go)});
@@ -39,6 +40,12 @@ function render(){
   let over=a.filter(r=>r.t==='overdue');
   let rep=a.filter(r=>reportFor(r));
   let show=filter==='soon'?soon:filter==='overdue'?over:filter==='reported'?rep:filter==='unreported'?a.filter(r=>!reportFor(r)):a;
+  $('#noWebsiteCount').textContent=fa(db.noWebsite.length);
+  if(filter==='nowebsite'){
+    let nw=db.noWebsite.slice().sort((x,y)=>new Date(y.createdAt||0)-new Date(x.createdAt||0));
+    $('#appointments').innerHTML=nw.length?nw.map(r=>`<article class="appointment"><h3>${esc(r.lead?.ownerName||'نام صاحب سایت ثبت نشده')}</h3><span class="badge">سایت نداشتند</span><div class="line"><b>سایت:</b> ${esc(r.lead?.url||'ثبت نشده')}</div><div class="line"><b>تلفن:</b> ${esc(r.lead?.phone||'ثبت نشده')}</div><div class="line"><b>توضیحات تماس:</b> ${esc(r.notes||'')}</div><div class="line"><b>نام پاسخ‌دهنده:</b> ${esc(r.contactName||'ثبت نشده')}</div><div class="line"><b>زمان ثبت گزارش:</b> ${fmt(r.createdAt)}</div></article>`).join(''):'<div class="result">هنوز لیدی با وضعیت «سایت نداشتند» ثبت نشده است.</div>';
+  }
+  else{
 
   $('#totalCount').textContent=fa(a.length);
   $('#soonCount').textContent=fa(soon.length);
@@ -64,6 +71,7 @@ function render(){
         <button type="button" class="reportBtn" data-report="${esc(key(r))}">${reportFor(r)?'ویرایش گزارش':'ثبت گزارش قرار'}</button>
       </article>`).join('')
     :'<div class="result">برای این فیلتر قراری وجود ندارد.</div>';
+  }
 
   $('#result').textContent=db.lastImport
     ?`${fa(db.lastImport.added)} قرار اضافه شد${db.lastImport.updated?`؛ ${fa(db.lastImport.updated)} قرار به‌روزرسانی شد`:''}؛ ${fa(db.lastImport.duplicates)} تکراری نادیده گرفته شد${db.lastImport.pruned?`؛ ${fa(db.lastImport.pruned)} قرار لغو‌شده از فهرست حذف شد`:''}.`
@@ -79,6 +87,12 @@ $('#jsonFile').addEventListener('change',async e=>{
     // فقط آخرین گزارش هر لید ملاک است؛ اگر آخرین وضعیت «قرار جلسه با کارشناس» نبود، قرارداد وارد نمی‌شود
     let latest=new Map();
     arr.forEach(r=>{if(!r||!r.leadId)return;let cur=latest.get(r.leadId);if(!cur||new Date(r.createdAt||0).getTime()>=new Date(cur.createdAt||0).getTime())latest.set(r.leadId,r)});
+    // لیدهایی که آخرین گزارش منشی «سایت نداشتند» است، در فهرست مجزایی نگه داشته می‌شوند
+    // (با حفظ موارد قبلی، تا در صورت وارد کردن فایل ناقص داده‌ها از بین نروند)
+    let nw=new Map();
+    db.noWebsite.forEach(r=>{if(r&&r.leadId)nw.set(r.leadId,r)});
+    latest.forEach(r=>{if(r.status==='سایت نداشتند')nw.set(r.leadId,r);else nw.delete(r.leadId)});
+    db.noWebsite=[...nw.values()];
     let pruned=0;
     if($('#pruneOnImport').checked){
       // قرارهای قبلی که طبق آخرین گزارش منشی دیگر جلسه‌ای ندارند حذف می‌شوند؛
@@ -139,7 +153,7 @@ $('#exportReports').onclick=()=>{
 $('#clearData').onclick=()=>{
   if(!confirm('اطلاعات پنل کارشناس پاک شود؟'))return;
   if(!confirm('تأیید نهایی: همه قرارها و گزارش‌های ثبت‌شده برای همیشه حذف می‌شوند. مطمئن هستید؟'))return;
-  db={appointments:[],reports:[],notified:{},alarmed:{},dismissed:[],lastImport:null};
+  db={appointments:[],reports:[],noWebsite:[],notified:{},alarmed:{},dismissed:[],lastImport:null};
   save();
 };
 
