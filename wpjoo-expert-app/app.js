@@ -1,4 +1,4 @@
-﻿const KEY='wpjoo.expert.v1',VERSION='۱۴۰۵/۰۷/۱۶', $=s=>document.querySelector(s), fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
+﻿const KEY='wpjoo.expert.v1',VERSION='۱۴۰۵/۰۷/۱۷', $=s=>document.querySelector(s), fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
 let vt=$('#versionTag');if(vt)vt.textContent='• نسخه '+VERSION;
 let db=JSON.parse(localStorage.getItem(KEY)||'{"appointments":[],"reports":[],"noWebsite":[],"lastImport":null}'),filter='all';
 if(!Array.isArray(db.reports))db.reports=[];
@@ -10,6 +10,8 @@ document.addEventListener('click',e=>{let b=e.target.closest('[data-go]');if(b)g
 const save=()=>{localStorage.setItem(KEY,JSON.stringify(db));render()};
 
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// آدرس سایت به‌صورت لینک نمایش داده می‌شود تا با کلیک، در مرورگر باز شود
+const siteLink=u=>{let s=String(u??'').trim();if(!s||s==='ثبت نشده')return esc(s);let url=/^https?:\/\//.test(s)?s:'https://'+s;return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(s)}</a>`};
 const date=v=>{let d=new Date(v);return Number.isNaN(d.getTime())?null:d};
 const key=r=>r.id||[r.leadId,r.followUp,r.createdAt,r.lead?.url].join('|');
 const type=r=>{let d=date(r.followUp);if(!d)return'bad';let x=d-Date.now();return x<0?'overdue':x<=86400000?'soon':'future'};
@@ -31,7 +33,7 @@ function render(){
       <article class="appointment reported">
         <h3>${esc(r.lead?.ownerName||r.ownerName||'نام صاحب سایت ثبت نشده')}</h3>
         <div class="line"><b>زمان قرار:</b> ${fmt(r.followUp)}</div>
-        <div class="line"><b>سایت:</b> ${esc(r.lead?.url||r.url||'ثبت نشده')}</div>
+        <div class="line"><b>سایت:</b> ${siteLink(r.lead?.url||r.url)}</div>
         <div class="line"><b>تلفن:</b> ${esc(r.lead?.phone||r.phone||'ثبت نشده')}</div>
         <div class="report-box"><b>قرارداد بسته شد</b><br>${esc(reportFor(r).notes||'')}<br><small>${fmt(reportFor(r).at)}</small></div>
       </article>`).join('')
@@ -43,7 +45,7 @@ function render(){
   $('#noWebsiteCount').textContent=fa(db.noWebsite.length);
   if(filter==='nowebsite'){
     let nw=db.noWebsite.slice().sort((x,y)=>new Date(y.createdAt||0)-new Date(x.createdAt||0));
-    $('#appointments').innerHTML=nw.length?nw.map(r=>`<article class="appointment"><h3>${esc(r.lead?.ownerName||'نام صاحب سایت ثبت نشده')}</h3><span class="badge">سایت نداشتند</span><div class="line"><b>سایت:</b> ${esc(r.lead?.url||'ثبت نشده')}</div><div class="line"><b>تلفن:</b> ${esc(r.lead?.phone||'ثبت نشده')}</div><div class="line"><b>توضیحات تماس:</b> ${esc(r.notes||'')}</div><div class="line"><b>نام پاسخ‌دهنده:</b> ${esc(r.contactName||'ثبت نشده')}</div><div class="line"><b>زمان ثبت گزارش:</b> ${fmt(r.createdAt)}</div></article>`).join(''):'<div class="result">هنوز لیدی با وضعیت «سایت نداشتند» ثبت نشده است.</div>';
+    $('#appointments').innerHTML=nw.length?nw.map(r=>`<article class="appointment"><h3>${esc(r.lead?.ownerName||'نام صاحب سایت ثبت نشده')}</h3><span class="badge">سایت نداشتند</span><div class="line"><b>سایت:</b> ${siteLink(r.lead?.url||r.url)}</div><div class="line"><b>تلفن:</b> ${esc(r.lead?.phone||'ثبت نشده')}</div><div class="line"><b>توضیحات تماس:</b> ${esc(r.notes||'')}</div><div class="line"><b>نام پاسخ‌دهنده:</b> ${esc(r.contactName||'ثبت نشده')}</div><div class="line"><b>زمان ثبت گزارش:</b> ${fmt(r.createdAt)}</div></article>`).join(''):'<div class="result">هنوز لیدی با وضعیت «سایت نداشتند» ثبت نشده است.</div>';
   }
   else{
 
@@ -63,7 +65,7 @@ function render(){
         <h3>${esc(r.lead?.ownerName||r.ownerName||'نام صاحب سایت ثبت نشده')}</h3>
         <span class="badge">${r.t==='soon'?'تا ۲۴ ساعت آینده':r.t==='overdue'?'گذشته':'آینده'}</span>
         <div class="line"><b>زمان قرار:</b> ${fmt(r.followUp)} — ${ago(r.followUp)}</div>
-        <div class="line"><b>سایت:</b> ${esc(r.lead?.url||r.url||'ثبت نشده')}</div>
+        <div class="line"><b>سایت:</b> ${siteLink(r.lead?.url||r.url)}</div>
         <div class="line"><b>تلفن:</b> ${esc(r.lead?.phone||r.phone||'ثبت نشده')}</div>
         <div class="line"><b>توضیحات:</b> ${esc(r.notes||'')}</div>
         <div class="line"><b>نام پاسخ‌دهنده:</b> ${esc(r.contactName||'ثبت نشده')}</div>
@@ -171,7 +173,7 @@ document.addEventListener('click',e=>{
   editingKey=b.dataset.report;
   let r=db.appointments.find(x=>key(x)===editingKey);
   if(!r)return;
-  $('#reportCard').innerHTML=`<h3>${esc(r.lead?.ownerName||r.ownerName||'نام صاحب سایت ثبت نشده')}</h3><div class="line"><b>زمان قرار:</b> ${fmt(r.followUp)}</div><div class="line"><b>سایت:</b> ${esc(r.lead?.url||r.url||'ثبت نشده')}</div><div class="line"><b>تلفن:</b> ${esc(r.lead?.phone||r.phone||'ثبت نشده')}</div>`;
+  $('#reportCard').innerHTML=`<h3>${esc(r.lead?.ownerName||r.ownerName||'نام صاحب سایت ثبت نشده')}</h3><div class="line"><b>زمان قرار:</b> ${fmt(r.followUp)}</div><div class="line"><b>سایت:</b> ${siteLink(r.lead?.url||r.url)}</div><div class="line"><b>تلفن:</b> ${esc(r.lead?.phone||r.phone||'ثبت نشده')}</div>`;
   let old=reportFor(r);
   $('#reportStatus').value=old?old.status:'';
   $('#reportNotes').value=old?old.notes:'';
