@@ -1,10 +1,11 @@
-﻿const KEY='wpjoo.expert.v1',VERSION='۱۴۰۵/۰۷/۱۷', $=s=>document.querySelector(s), fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
+﻿const KEY='wpjoo.expert.v1',VERSION='۱۴۰۵/۰۷/۱۸', $=s=>document.querySelector(s), fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
 let vt=$('#versionTag');if(vt)vt.textContent='• نسخه '+VERSION;
 let db=JSON.parse(localStorage.getItem(KEY)||'{"appointments":[],"reports":[],"noWebsite":[],"lastImport":null}'),filter='all';
 if(!Array.isArray(db.reports))db.reports=[];
 if(!Array.isArray(db.noWebsite))db.noWebsite=[];
 
 function go(id){document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));$('#'+id).classList.add('active');if(id==='main')render()}
+let deferred;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e});function installApp(){if(deferred){deferred.prompt();deferred=null;return}let ios=/iPhone|iPad|iPod/.test(navigator.userAgent)&&!window.MSStream;alert(ios?'روی آیفون/آیپد: دکمهٔ اشتراک (آیکون مستطیل با فلش بالا) را بزنید و «Add to Home Screen / افزودن به صفحه اصلی» را انتخاب کنید.':'از منوی مرورگر (⋮ یا ⌘) گزینهٔ «Install app / نصب برنامه» یا «Add to Home Screen» را انتخاب کنید.')}
 document.addEventListener('click',e=>{let b=e.target.closest('[data-go]');if(b)go(b.dataset.go)});
 
 const save=()=>{localStorage.setItem(KEY,JSON.stringify(db));render()};
@@ -250,4 +251,6 @@ if('Notification' in window){
   else $('#notifyBtn').classList.remove('hidden');
 }
 $('#notifyBtn').onclick=()=>{Notification.requestPermission().then(p=>{if(p==='granted'){$('#notifyBtn').classList.add('hidden');checkReminders();setInterval(checkReminders,30000)}else alert('دسترسی نوتیفیکیشن داده نشد.')})};
+$('#installBtn').onclick=installApp;
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
 navigator.serviceWorker.addEventListener('message',e=>{if(e.data&&e.data.dismiss){let k=e.data.dismiss;if(!db.dismissed)db.dismissed=[];if(!db.dismissed.includes(k))db.dismissed.push(k);save()}});
